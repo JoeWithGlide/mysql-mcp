@@ -57,40 +57,44 @@ function isSafeQuery(query: string): boolean {
   // Must start with SELECT
   if (!q.startsWith("select")) return false;
 
-  // Block multiple statements
-  if (q.includes(";")) return false;
+  // Block multiple statements (but allow semicolons inside quoted strings)
+  // Simple check: if there's a semicolon not inside quotes, reject
+  // For safety, we'll just check if there's a semicolon followed by non-whitespace
+  const withoutStrings = q.replace(/'[^']*'/g, "''").replace(/"[^"]*"/g, '""');
+  if (withoutStrings.includes(";")) return false;
 
   // Block SQL comments (potential injection vectors)
-  if (q.includes("--") || q.includes("/*")) return false;
+  if (withoutStrings.includes("--") || withoutStrings.includes("/*")) return false;
 
-  // Block dangerous keywords
+  // Block dangerous keywords - must be whole words (using word boundaries)
+  // These keywords should not appear as standalone SQL commands
   const forbidden = [
-    "insert",
-    "update",
-    "delete",
-    "drop",
-    "create",
-    "alter",
-    "truncate",
-    "replace",
-    "grant",
-    "revoke",
-    "set ",
-    "use ",
-    "commit",
-    "rollback",
-    "lock ",
-    "unlock ",
-    "call ",
-    "execute ",
-    "prepare ",
-    "deallocate ",
-    "load ",
-    "into outfile",
-    "into dumpfile",
+    /\binsert\b/,
+    /\bupdate\b(?!\s*\()/,  // Allow UPDATE() function but not UPDATE statement
+    /\bdelete\b(?!\s*\()/,  // Allow DELETE() function but not DELETE statement  
+    /\bdrop\b/,
+    /\bcreate\b(?!\s*\()/,  // Allow CREATE() function but not CREATE statement
+    /\balter\b/,
+    /\btruncate\b/,
+    /\breplace\b(?!\s*\()/,  // Allow REPLACE() function but not REPLACE statement
+    /\bgrant\b/,
+    /\brevoke\b/,
+    /\bset\b(?!\s*\()/,  // Allow SET() function but not SET statement
+    /\buse\b(?=\s+\w)/,  // Block USE database but allow "use" in other contexts
+    /\bcommit\b/,
+    /\brollback\b/,
+    /\block\s+tables?\b/,
+    /\bunlock\s+tables?\b/,
+    /\bcall\b/,
+    /\bexecute\b/,
+    /\bprepare\b/,
+    /\bdeallocate\b/,
+    /\bload\b/,
+    /\binto\s+outfile\b/,
+    /\binto\s+dumpfile\b/,
   ];
 
-  return !forbidden.some((word) => q.includes(word));
+  return !forbidden.some((pattern) => pattern.test(withoutStrings));
 }
 
 // Create MCP server
