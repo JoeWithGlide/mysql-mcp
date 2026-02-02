@@ -31,6 +31,7 @@ DB_HOST=localhost
 DB_USER=ai_readonly
 DB_PASSWORD=your_password
 DB_NAME=your_database
+ENV=local # or staging/prod
 ```
 
 ### Creating a Read-Only MySQL User
